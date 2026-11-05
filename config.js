@@ -12,7 +12,7 @@ window.ELYFLUFF_CONFIG = {
   X_HANDLE: "ElyFluff",
 
   /* The X post people must like, repost and comment on */
-  TASK_POST_URL: "https://x.com/ElyFluff/status/1000000000000000000",
+  TASK_POST_URL: "https://x.com/ElyFluff/status/2118489278061699218",
 
   /* Your website address (used for share posts and referral links) */
   SITE_URL: "https://elyfluff.xyz",
