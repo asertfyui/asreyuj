@@ -7,7 +7,7 @@
   var SUPPLY = Number(C.NFT_SUPPLY) || 3000;
   var TICKER = C.TICKER || '$FLUFF';
   var DEMO = !C.SCRIPT_URL;
-  var LAUNCH = Date.parse(C.ELYSIUM_LAUNCH_UTC || '');
+  var LAUNCH_TXT = C.LAUNCH_TEXT || 'announced on X';
 
   function $(s, r) { return (r || document).querySelector(s); }
   function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
@@ -36,15 +36,6 @@
   function handle() { return String(C.X_HANDLE || 'ElyFluff').replace(/^@/, ''); }
   function openUrl(url) { if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
-  function timeLeft() {
-    var diff = LAUNCH - Date.now();
-    if (isNaN(LAUNCH)) return null;
-    if (diff <= 0) return { live: true, d: 0, h: 0, m: 0, s: 0 };
-    var d = Math.floor(diff / 864e5); diff %= 864e5;
-    var h = Math.floor(diff / 36e5); diff %= 36e5;
-    var m = Math.floor(diff / 6e4); diff %= 6e4;
-    return { live: false, d: d, h: h, m: m, s: Math.floor(diff / 1000) };
-  }
   function ago(t) {
     var s = Math.max(1, Math.floor((Date.now() - t) / 1000));
     if (s < 60) return s + 's ago';
@@ -107,7 +98,7 @@
 
   /* ---------- config text ---------- */
   function fillConfig() {
-    var map = { TICKER: TICKER, NFT_SUPPLY_FMT: fmt(SUPPLY), TOKEN_SUPPLY: C.TOKEN_SUPPLY || 'TBA', X_HANDLE_AT: '@' + handle(), GTD_MINT_PRICE: C.GTD_MINT_PRICE || '0.33 HYPE' };
+    var map = { TICKER: TICKER, NFT_SUPPLY_FMT: fmt(SUPPLY), TOKEN_SUPPLY: C.TOKEN_SUPPLY || 'TBA', X_HANDLE_AT: '@' + handle(), GTD_MINT_PRICE: C.GTD_MINT_PRICE || 'FREE' };
     $$('[data-cfg]').forEach(function (e) { var v = map[e.getAttribute('data-cfg')]; if (v != null) e.textContent = v; });
     $$('[data-x-profile]').forEach(function (a) { a.href = 'https://x.com/' + encodeURIComponent(handle()); });
     var t = $('.title');
@@ -265,8 +256,6 @@
   /* ---------- live values ---------- */
   var LIVE = { blk: 'syncing...', apps: '--' }, liveStarted = false;
   function paintLive() {
-    var t = timeLeft();
-    if (t) { var txt = t.live ? 'LIVE' : t.d + 'd ' + pad(t.h, 2) + 'h ' + pad(t.m, 2) + 'm ' + pad(t.s, 2) + 's'; $$('.cdv').forEach(function (e) { e.textContent = txt; }); }
     $$('.blk').forEach(function (e) { if (e.textContent !== LIVE.blk) { e.textContent = LIVE.blk; e.classList.remove('tick'); void e.offsetWidth; e.classList.add('tick'); } });
     $$('.apps').forEach(function (e) { if (e.textContent !== LIVE.apps) { e.textContent = LIVE.apps; e.classList.remove('tick'); void e.offsetWidth; e.classList.add('tick'); } });
   }
@@ -274,7 +263,7 @@
     if (liveStarted) { paintLive(); return; }
     liveStarted = true;
     paintLive(); setInterval(paintLive, 1000);
-    var url = C.HYPEREVM_TESTNET_RPC, fails = 0, timer, got = false;
+    var url = C.RPC_URL || '', fails = 0, timer, got = false;
     async function blk() {
       try {
         var ctrl = new AbortController(), to = setTimeout(function () { ctrl.abort(); }, 6000);
@@ -284,7 +273,7 @@
         if (!isFinite(n)) throw 0;
         fails = 0; got = true; LIVE.blk = '#' + fmt(n);
       } catch (e) {
-        if (++fails > 2) { clearInterval(timer); if (!got) LIVE.blk = 'online'; }
+        if (++fails > 2) { clearInterval(timer); if (!got) LIVE.blk = 'live'; }
       }
     }
     if (url) { blk(); timer = setInterval(function () { if (!document.hidden) blk(); }, 4000); } else LIVE.blk = 'online';
@@ -304,9 +293,10 @@
     await typeLine('$ ./whitelist --project elyfluff', null, 24);
     await pause(250);
     line('[boot] loading whitelist protocol... done', 'dim'); await pause(150);
-    line('[boot] network: hyperevm testnet → elysium mainnet', 'dim'); await pause(150);
-    line([['dim', '[boot] hyperevm testnet block: '], ['live-v blk', LIVE.blk]]); await pause(150);
-    line([['dim', '[boot] elysium mainnet in: '], ['live-v cdv', '--']]); await pause(150);
+    line('[boot] network: elysium mainnet (hyperliquid L2)', 'dim'); await pause(150);
+    line([['dim', '[boot] elysium block: '], ['live-v blk', LIVE.blk]]); await pause(150);
+    line([['dim', '[boot] mint: '], ['hl teal', 'FREE · ' + fmt(SUPPLY) + ' ElyFluffs']]); await pause(150);
+    line([['dim', '[boot] launch date: '], ['hl', LAUNCH_TXT]]); await pause(150);
     line([['dim', '[boot] applicants: '], ['live-v apps', LIVE.apps]]); await pause(150);
     line([['dim', '[boot] status: '], ['hl', TICKER + ' WHITELIST OPEN']]);
     gap();
@@ -314,6 +304,9 @@
     scanWindow();
     gap();
     collectionWindow(false);
+    gap();
+    await typeLine('$ ./check --wallet', null, 18);
+    walletCheckWindow();
     gap();
     line([['dim', '[vault] project files are encrypted. complete the tasks to decrypt.']]);
     var v = el('div', 'vault-locked');
@@ -587,7 +580,7 @@
   /* ---------- wallet ---------- */
   async function walletStage() {
     gap();
-    line('? enter your EVM wallet address for HyperEVM testnet (starts with 0x).');
+    line('? enter your EVM wallet address for Elysium mainnet (starts with 0x). your free mint and ' + TICKER + ' go to this wallet.');
     if (WL.complete && WL.wallet) { line([['ps', 'wallet@elyfluff:~$ '], WL.wallet]); line('✓ whitelisted', 'ok'); return; }
     while (true) {
       var v = await ask('wallet@elyfluff:~$', '0x...', { paste: true, max: 70 });
@@ -658,7 +651,7 @@
 
   /* ---------- permit ---------- */
   function shareText() {
-    return 'I just got my ' + (C.PROJECT_NAME || 'ElyFluff') + ' whitelist permit.\n\n' + fmt(SUPPLY) + ' NFTs + ' + TICKER + '. Testnet on HyperEVM, mainnet on Elysium.\n\nJoin with my invite: ' + refLink() + '\n\n@' + handle();
+    return 'I just got my ' + (C.PROJECT_NAME || 'ElyFluff') + ' whitelist permit.\n\n' + fmt(SUPPLY) + ' NFTs + ' + TICKER + '. Free mint on Elysium mainnet.\n\nJoin with my invite: ' + refLink() + '\n\n@' + handle();
   }
   function shareX() { openUrl('https://x.com/intent/tweet?text=' + encodeURIComponent(shareText())); }
   function permitStage() {
@@ -768,7 +761,7 @@
     x.fillStyle = CR; x.fillText('WHITELISTED', rx + 7, 305);
     x.fillStyle = PAPER; x.fillText('WHITELISTED', rx, 298);
     x.strokeStyle = INK; x.lineWidth = 4; x.strokeText('WHITELISTED', rx, 298);
-    var rows = [['wallet', shortWallet(WL.wallet) || '0x...'], ['permit_id', WL.applicantId || 'EF-00000'], ['issued', new Date().toLocaleDateString('en-GB').replace(/\//g, '.')], ['network', 'hyperevm → elysium']];
+    var rows = [['wallet', shortWallet(WL.wallet) || '0x...'], ['permit_id', WL.applicantId || 'EF-00000'], ['issued', new Date().toLocaleDateString('en-GB').replace(/\//g, '.')], ['network', 'elysium mainnet']];
     rows.forEach(function (r, i) {
       var yy = 372 + i * 42;
       T(r[0], rx, yy, '500 19px "IBM Plex Mono", monospace', '#5F6E6A', 0);
@@ -814,12 +807,12 @@
     var gz = tierZone(m.gameRank, R.GAME_GTD || 200, R.GAME_FCFS || 300), rz = tierZone(m.refRank, R.REF_GTD || 100, R.REF_FCFS || 200);
     setText('meGameRank', gz); setText('meRefRank', rz); setText('meGameRank3', gz); setText('meRefRank3', rz);
     var ca = document.getElementById('clAmount');
-    if (ca) ca.textContent = fmt(game + bonus) + ' ' + TICKER + (m.status === 'FCFS' ? ' + ' + fmt(m.fcfsTokens || 1000) + ' FCFS' : '');
+    if (ca) ca.textContent = fmt(game + bonus) + ' ' + TICKER;
     setText('meRefs', fmt(m.refs || 0));
     setText('meRefs2', fmt(m.refs || 0)); setText('meBonus2', fmt(bonus) + ' ' + TICKER);
     setText('meRefRank2', m.refRank ? '#' + fmt(m.refRank) : '—');
     var st = m.status || 'PENDING';
-    var stTxt = st === 'GTD' ? 'GTD · you can mint' : st === 'FCFS' ? 'FCFS · you can claim' : 'whitelisted · selection pending';
+    var stTxt = st === 'GTD' ? 'GTD · free mint guaranteed' : st === 'FCFS' ? 'FCFS · free mint, first come' : 'whitelisted · selection pending';
     setText('meStatus', stTxt + (m.selectedBy ? ' (' + m.selectedBy.toLowerCase() + ')' : ''));
     var li = $('#myInvites');
     if (li) {
@@ -844,7 +837,7 @@
     if (WL.key) mt.appendChild(button('my access key', 'btn-sm btn-ghost', openKeyModal));
     mt.appendChild(resetBtn());
     OUT.appendChild(mt);
-    line([['dim', '[live] hyperevm block '], ['live-v blk', LIVE.blk], ['dim', ' · elysium in '], ['live-v cdv', '--'], ['dim', ' · '], ['live-v apps', LIVE.apps]]);
+    line([['dim', '[live] elysium block '], ['live-v blk', LIVE.blk], ['dim', ' · launch '], ['hl', LAUNCH_TXT], ['dim', ' · '], ['live-v apps', LIVE.apps]]);
     paintLive();
     gap();
     await typeLine('$ ./me --stats', null, 20);
@@ -880,7 +873,7 @@
     body.appendChild(g);
     var sl = el('div', 'ln'); sl.appendChild(el('span', 'dim', 'status: ')); var sv = el('span', 'hl teal', '—'); sv.id = 'meStatus'; sl.appendChild(sv);
     body.appendChild(sl);
-    body.appendChild(el('div', 'ln dim', 'mainnet: the ' + TICKER + ' you earn in the arena carries over 1:1, for ElyFluff NFT holders only.'));
+    body.appendChild(el('div', 'ln dim', 'everything you earn here is paid as real ' + TICKER + ' on Elysium mainnet, to your registered wallet.'));
     renderMe();
   }
 
@@ -1011,13 +1004,13 @@
     var cl = el('div', 'claim');
     var ct = el('div', 'claim-top');
     var ci = el('img'); ci.src = C.TOKEN_LOGO || 'fluff-token.svg'; ci.alt = TICKER; ct.appendChild(ci);
-    var cw = el('div'); cw.appendChild(el('span', 'dim', 'your claimable ' + TICKER + ' (testnet)'));
+    var cw = el('div'); cw.appendChild(el('span', 'dim', 'your claimable ' + TICKER + ' (Elysium mainnet)'));
     var mv = el('b', null, fmt((WL.game || 0) + (WL.bonus || 0)) + ' ' + TICKER); mv.id = 'myGame'; cw.appendChild(mv);
     ct.appendChild(cw); cl.appendChild(ct);
-    var go = button((C.CLAIM_LIVE && C.CLAIM_CONTRACT) ? 'claim on testnet ↓' : '[ claim opens soon ]', (C.CLAIM_LIVE && C.CLAIM_CONTRACT) ? '' : 'btn-ghost', function () { var t = $('#launchpad'); if (t) t.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' }); });
+    var go = button((C.CLAIM_LIVE && C.CLAIM_CONTRACT) ? 'claim on Elysium ↓' : '[ claim opens soon ]', (C.CLAIM_LIVE && C.CLAIM_CONTRACT) ? '' : 'btn-ghost', function () { var t = $('#launchpad'); if (t) t.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' }); });
     if (!(C.CLAIM_LIVE && C.CLAIM_CONTRACT)) go.disabled = true;
     cl.appendChild(go);
-    cl.appendChild(el('div', 'ln dim', 'game + invite bonus. on mainnet you get the same amount again if you hold an ElyFluff NFT.'));
+    cl.appendChild(el('div', 'ln dim', 'game + invite bonus. paid as real ' + TICKER + ' on Elysium mainnet.'));
     right.appendChild(cl);
     L.appendChild(hero); L.appendChild(right);
     body.appendChild(L);
@@ -1082,9 +1075,9 @@
 
     await typeLine('$ cat about.txt', null, 16);
     var a = win('elyfluff@vault: ~/about.txt');
-    [['ElyFluff is a ' + fmt(SUPPLY) + '-piece NFT collection paired with the ' + TICKER + ' token, built for the Elysium mainnet.'],
-     ['Before mainnet, ElyFluff runs a full test launch on HyperEVM Testnet. Wallets that hold the testnet NFT or testnet ' + TICKER + ' qualify for Elysium mainnet.'],
-     ['Every ' + TICKER + ' you earn in Fluff Arena on testnet is paid again 1:1 on mainnet, as long as you hold an ElyFluff NFT.']].forEach(function (p) { a.appendChild(el('div', 'ln', p[0])); });
+    [['ElyFluff is a ' + fmt(SUPPLY) + '-piece NFT collection paired with the ' + TICKER + ' token, launching directly on Elysium mainnet.'],
+     ['The mint is FREE on OpenSea. Selected wallets mint first: GTD is guaranteed, FCFS mints next while supply lasts. You only pay the gas fee.'],
+     ['Every ' + TICKER + ' you earn in Fluff Arena, plus your invite bonus, is paid as real ' + TICKER + ' on Elysium mainnet.']].forEach(function (p) { a.appendChild(el('div', 'ln', p[0])); });
     gap();
 
     await typeLine('$ cat tokenomics.cfg', null, 16);
@@ -1113,7 +1106,11 @@
     selectionWindow();
     gap();
 
-    await typeLine('$ ./launchpad.sh --network hyperevm-testnet', null, 16);
+    await typeLine('$ ./check --wallet', null, 16);
+    walletCheckWindow();
+    gap();
+
+    await typeLine('$ ./launchpad.sh --mint opensea --claim elysium', null, 16);
     launchpadWindow();
     gap();
 
@@ -1139,14 +1136,15 @@
     var w = win('elyfluff@vault: ~/selection.rules', 'red wide');
     var tb = el('div', 'rules-t');
     function row(cells, cls) { var r = el('div', 'rt-r' + (cls ? ' ' + cls : '')); cells.forEach(function (c) { r.appendChild(el('span', null, c)); }); tb.appendChild(r); }
-    row(['source', 'GTD (NFT mint)', 'FCFS (' + TICKER + ')'], 'rt-h');
+    row(['source', 'GTD · free, guaranteed', 'FCFS · free, first come'], 'rt-h');
     row(['game leaderboard', 'rank 1 – ' + (R.GAME_GTD || 200), 'rank ' + ((R.GAME_GTD || 200) + 1) + ' – ' + ((R.GAME_GTD || 200) + (R.GAME_FCFS || 300))]);
     row(['invite leaderboard', 'rank 1 – ' + (R.REF_GTD || 100), 'rank ' + ((R.REF_GTD || 100) + 1) + ' – ' + ((R.REF_GTD || 100) + (R.REF_FCFS || 200))]);
     row(['raffle', 'remaining spots', 'remaining spots'], 'rt-raffle');
     w.appendChild(tb);
     [['raffle', 'every wallet that finished the whitelist and is not selected yet joins the draw. the seed is announced on X first.'],
      ['best tier wins', 'if you qualify twice, you keep the higher tier (GTD beats FCFS).'],
-     ['mainnet', 'game ' + TICKER + ' earned on testnet = the same amount on mainnet, only for wallets that hold an ElyFluff NFT.'],
+     ['free mint', 'on OpenSea. GTD stage first, then FCFS until all ' + fmt(SUPPLY) + ' are gone. one free mint per wallet, gas only.'],
+     [TICKER, 'everything you earn in the arena is paid on Elysium mainnet.'],
      ['fair play', 'rounds are checked by the server. cheated scores are removed before selection.']].forEach(function (r) {
       var d = el('div', 'ln'); d.appendChild(el('span', 'k', r[0])); d.appendChild(document.createTextNode(' ' + r[1])); w.appendChild(d);
     });
@@ -1154,6 +1152,18 @@
     me.appendChild(el('span', 'dim', ' · invites ')); var r2 = el('span', 'hl', '—'); r2.id = 'meRefRank3'; me.appendChild(r2);
     w.appendChild(me);
     renderMe();
+  }
+
+  /* ---------- wallet checker ---------- */
+  function walletCheckWindow() {
+    var body = win('elyfluff@winners: ~/check', 'teal wide wcheck');
+    body.appendChild(el('h3', 'wc-h', 'Are you a winner?'));
+    body.appendChild(el('p', 'login-p', 'Check with your X username or your wallet address.'));
+    var row = el('div', 'login-row');
+    var a = el('a', 'btn btn-big', 'open winner checker ↗'); a.href = 'checker' + (WL.username ? '?q=' + encodeURIComponent(WL.username) : '');
+    row.appendChild(a);
+    body.appendChild(row);
+    return body;
   }
 
   /* ---------- launchpad (on-chain) ---------- */
@@ -1178,91 +1188,73 @@
     function paintW() {
       if (!CW.addr) return;
       wtxt.className = ''; wtxt.textContent = '';
-      wtxt.appendChild(el('span', 'ok', '● ')); wtxt.appendChild(document.createTextNode(shortWallet(CW.addr) + ' · ' + (C.CHAIN_NAME || 'HyperEVM Testnet')));
+      wtxt.appendChild(el('span', 'ok', '● ')); wtxt.appendChild(document.createTextNode(shortWallet(CW.addr) + ' · ' + (C.CHAIN_NAME || 'Elysium')));
       var reg = String(WL.walletFull || '').toLowerCase();
       if (reg && reg !== CW.addr) wtxt.appendChild(el('span', 'err', '  ✗ not your registered wallet (' + shortWallet(reg) + ')'));
       cbtn.textContent = 'connected ✓'; cbtn.disabled = true;
     }
-    var pd = el('div', 'pad');
+    var pd = el('div', 'pad pad3');
     function card(cls, tier, title, rows) {
       var m = el('div', 'mint ' + cls);
-      m.appendChild(el('span', 'hl' + (cls === 'fcfs' ? ' ink' : ''), tier));
+      m.appendChild(el('span', 'hl' + (cls === 'fcfs' ? ' ink' : cls === 'claimc' ? ' teal' : ''), tier));
       m.appendChild(el('h4', null, title));
       rows.forEach(function (r) { var rw = el('div', 'row'); rw.appendChild(el('span', null, r[0])); var v = el('span', null, r[1]); if (r[2]) v.id = r[2]; rw.appendChild(v); m.appendChild(rw); });
       var out = el('div', 'mint-out'); m.out = out;
-      m.say = function (t, cls2, hash) { out.textContent = ''; out.className = 'mint-out ' + (cls2 || ''); out.appendChild(document.createTextNode(t)); if (hash) { out.appendChild(document.createTextNode(' ')); out.appendChild(txLink(hash)); } };
+      m.say = function (t, cls2, hash) { out.textContent = ''; out.className = 'mint-out ' + (cls2 || ''); out.appendChild(document.createTextNode(t)); if (hash && C.EXPLORER_URL) { out.appendChild(document.createTextNode(' ')); out.appendChild(txLink(hash)); } };
       return m;
     }
-    var nftOn = !!(C.MINT_LIVE && C.NFT_CONTRACT && FC), clOn = !!(C.CLAIM_LIVE && C.CLAIM_CONTRACT && FC);
-    var g = card('gtd', 'GTD', 'ElyFluff NFT mint', [['price', C.GTD_MINT_PRICE || '0.33 HYPE'], ['minted', '— / ' + fmt(SUPPLY), 'nftMinted'], ['network', C.CHAIN_NAME || 'HyperEVM Testnet'], ['access', 'GTD list · 1 per wallet']]);
-    var gb = el('button', 'soon' + (nftOn ? ' live' : ''), nftOn ? 'mint now ↗' : '[ coming soon ]'); gb.type = 'button'; if (!nftOn) gb.disabled = true;
-    g.appendChild(gb); g.appendChild(g.out);
-    var f = card('fcfs', 'FCFS + PLAYERS', TICKER + ' claim', [['your amount', fmt((WL.game || 0) + (WL.bonus || 0)) + ' ' + TICKER + (ME && ME.status === 'FCFS' ? ' + ' + fmt(ME.fcfsTokens || 1000) : ''), 'clAmount'], ['asset', 'testnet ' + TICKER], ['network', C.CHAIN_NAME || 'HyperEVM Testnet'], ['access', 'FCFS list + every arena player']]);
-    var fb = el('button', 'soon' + (clOn ? ' live' : ''), clOn ? 'claim ' + TICKER + ' ↗' : '[ coming soon ]'); fb.type = 'button'; if (!clOn) fb.disabled = true;
-    f.appendChild(fb); f.appendChild(f.out);
-    pd.appendChild(g); pd.appendChild(f); lp.appendChild(pd);
-
-    if (C.NFT_CONTRACT && FC) FC.readUint(C.NFT_CONTRACT, FC.dataNoArgs('totalSupply()')).then(function (v) { if (v != null) setText('nftMinted', fmt(Number(v)) + ' / ' + fmt(SUPPLY)); });
+    var osOn = !!(C.MINT_LIVE && C.OPENSEA_URL);
+    function osBtn(m) {
+      var b = el('a', 'soon' + (osOn ? ' live' : ''), osOn ? 'mint on OpenSea ↗' : '[ OpenSea link soon ]');
+      if (osOn) { b.href = C.OPENSEA_URL; b.target = '_blank'; b.rel = 'noopener noreferrer'; }
+      else b.setAttribute('aria-disabled', 'true');
+      m.appendChild(b); m.appendChild(m.out); return b;
+    }
+    var clOn = !!(C.CLAIM_LIVE && C.CLAIM_CONTRACT && FC);
+    var net = C.CHAIN_NAME || 'Elysium';
+    var g = card('gtd', 'GTD', 'Free mint · guaranteed', [['price', 'FREE (gas only)'], ['where', 'OpenSea'], ['stage', '1 · GTD list'], ['limit', '1 per wallet']]);
+    osBtn(g);
+    var f = card('fcfs', 'FCFS', 'Free mint · first come', [['price', 'FREE (gas only)'], ['where', 'OpenSea'], ['stage', '2 · after GTD'], ['limit', '1 per wallet · while supply lasts']]);
+    osBtn(f);
+    var k = card('claimc', TICKER, TICKER + ' claim', [['your amount', fmt((WL.game || 0) + (WL.bonus || 0)) + ' ' + TICKER, 'clAmount'], ['from', 'arena + invite bonus'], ['network', net + ' mainnet'], ['where', 'this website']]);
+    var kb = el('button', 'soon' + (clOn ? ' live' : ''), clOn ? 'claim ' + TICKER + ' ↗' : '[ claim opens soon ]'); kb.type = 'button'; if (!clOn) kb.disabled = true;
+    k.appendChild(kb); k.appendChild(k.out);
+    pd.appendChild(g); pd.appendChild(f); pd.appendChild(k); lp.appendChild(pd);
+    lp.appendChild(el('div', 'ln err', '✗ only mint from the OpenSea link on this site or on @' + handle() + '. never from links in DMs.'));
 
     async function ensureW(card2) {
-      if (CW.addr) return true;
+      if (CW.addr) { try { await FC.ensureChain(); } catch (e) {} return true; }
       try { CW.addr = await FC.connect(); paintW(); return true; } catch (e) { card2.say('✗ ' + chainErr(e), 'err'); return false; }
     }
     async function proofFor(t) { return DEMO ? { ok: true, ready: false } : apiGet('action=proof&t=' + t + '&a=' + CW.addr); }
     var busy = false;
-    gb.addEventListener('click', async function () {
-      if (busy || !nftOn) return; busy = true; gb.disabled = true;
+    kb.addEventListener('click', async function () {
+      if (busy || !clOn) return; busy = true; kb.disabled = true;
       try {
-        if (!(await ensureW(g))) return;
-        g.say('> checking the GTD list...', 'dim');
-        var p = await proofFor('gtd');
-        if (!p || !p.ok) return g.say('✗ could not load the list. try again.', 'err');
-        if (!p.ready) return g.say('✗ the GTD list is not published yet. follow @' + handle() + '.', 'err');
-        if (!p.found) return g.say('✗ ' + shortWallet(CW.addr) + ' is not on the GTD list. switch to your registered wallet.', 'err');
-        var onRoot = await FC.readBytes32(C.NFT_CONTRACT, 'gtdRoot()');
-        if (onRoot && p.root && onRoot !== String(p.root).toLowerCase()) return g.say('✗ the list is being updated. try again in a few minutes.', 'err');
-        var ph = await FC.readUint(C.NFT_CONTRACT, FC.dataNoArgs('phase()'));
-        if (ph != null && Number(ph) !== 1) return g.say('✗ the GTD mint is not open yet.', 'err');
-        var done = await FC.readUint(C.NFT_CONTRACT, FC.dataAddr('gtdMinted(address)', CW.addr));
-        if (done != null && Number(done) > 0) return g.say('✓ you already minted your GTD ElyFluff.', 'ok');
-        var price = await FC.readUint(C.NFT_CONTRACT, FC.dataNoArgs('price()'));
-        var val = price != null ? '0x' + (BigInt(price).toString(16)) : FC.hypeToWeiHex(C.GTD_MINT_PRICE);
-        g.say('> confirm the mint in your wallet...', 'dim');
-        var hash = await FC.send(CW.addr, C.NFT_CONTRACT, FC.dataMintGTD(p.proof), val);
-        g.say('> sent. waiting for the block...', 'dim', hash);
-        var rc = await FC.waitReceipt(hash);
-        if (rc && rc.status === '0x1') { g.say('✓ minted! welcome to ElyFluff.', 'ok', hash); FC.readUint(C.NFT_CONTRACT, FC.dataNoArgs('totalSupply()')).then(function (v) { if (v != null) setText('nftMinted', fmt(Number(v)) + ' / ' + fmt(SUPPLY)); }); }
-        else g.say(rc ? '✗ the transaction failed.' : '… still pending. check the explorer.', rc ? 'err' : 'dim', hash);
-      } catch (e) { g.say('✗ ' + chainErr(e), 'err'); }
-      finally { busy = false; gb.disabled = false; }
-    });
-    fb.addEventListener('click', async function () {
-      if (busy || !clOn) return; busy = true; fb.disabled = true;
-      try {
-        if (!(await ensureW(f))) return;
-        f.say('> checking the claim list...', 'dim');
+        if (!(await ensureW(k))) return;
+        k.say('> checking the claim list...', 'dim');
         var p = await proofFor('claim');
-        if (!p || !p.ok) return f.say('✗ could not load the list. try again.', 'err');
-        if (!p.ready) return f.say('✗ the claim list is not published yet.', 'err');
-        if (!p.found) return f.say('✗ nothing to claim for ' + shortWallet(CW.addr) + ' yet. the list is updated regularly.', 'err');
+        if (!p || !p.ok) return k.say('✗ could not load the list. try again.', 'err');
+        if (!p.ready) return k.say('✗ the claim list is not published yet.', 'err');
+        if (!p.found) return k.say('✗ nothing to claim for ' + shortWallet(CW.addr) + ' yet. the list is updated regularly.', 'err');
         var onRoot = await FC.readBytes32(C.CLAIM_CONTRACT, 'merkleRoot()');
-        if (onRoot && p.root && onRoot !== String(p.root).toLowerCase()) return f.say('✗ the list is being updated. try again in a few minutes.', 'err');
+        if (onRoot && p.root && onRoot !== String(p.root).toLowerCase()) return k.say('✗ the list is being updated. try again in a few minutes.', 'err');
         var got = await FC.readUint(C.CLAIM_CONTRACT, FC.dataAddr('claimed(address)', CW.addr));
         var due = BigInt(p.wei) - BigInt(got || '0');
-        if (due <= 0n) return f.say('✓ all claimed (' + fmt(p.amount) + ' ' + TICKER + '). play more: new ' + TICKER + ' is added when the list updates.', 'ok');
-        f.say('> confirm the claim of ' + FC.weiToTokens(due.toString()) + ' ' + TICKER + ' in your wallet...', 'dim');
+        if (due <= 0n) return k.say('✓ all claimed (' + fmt(p.amount) + ' ' + TICKER + '). play more: new ' + TICKER + ' is added when the list updates.', 'ok');
+        k.say('> confirm the claim of ' + FC.weiToTokens(due.toString()) + ' ' + TICKER + ' in your wallet...', 'dim');
         var hash = await FC.send(CW.addr, C.CLAIM_CONTRACT, FC.dataClaim(p.wei, p.proof));
-        f.say('> sent. waiting for the block...', 'dim', hash);
+        k.say('> sent. waiting for the block...', 'dim', hash);
         var rc = await FC.waitReceipt(hash);
         if (rc && rc.status === '0x1') {
-          f.say('✓ claimed ' + FC.weiToTokens(due.toString()) + ' ' + TICKER + '.', 'ok', hash);
+          k.say('✓ claimed ' + FC.weiToTokens(due.toString()) + ' ' + TICKER + '.', 'ok', hash);
           if (C.TOKEN_CONTRACT && window.ethereum) window.ethereum.request({ method: 'wallet_watchAsset', params: { type: 'ERC20', options: { address: C.TOKEN_CONTRACT, symbol: 'FLUFF', decimals: 18, image: siteBase() + '/fluff-token.png' } } }).catch(function () {});
-        } else f.say(rc ? '✗ the transaction failed.' : '… still pending. check the explorer.', rc ? 'err' : 'dim', hash);
-      } catch (e) { f.say('✗ ' + chainErr(e), 'err'); }
-      finally { busy = false; fb.disabled = false; }
+        } else k.say(rc ? '✗ the transaction failed.' : '… still pending. check the explorer.', rc ? 'err' : 'dim', hash);
+      } catch (e) { k.say('✗ ' + chainErr(e), 'err'); }
+      finally { busy = false; kb.disabled = false; }
     });
     if (!FC) lp.appendChild(el('div', 'ln err', '✗ chain.js is missing. upload it next to index.html.'));
-    lp.appendChild(el('div', 'ln dim', 'you need test HYPE for gas. never share your seed phrase: this site only asks your wallet to sign.'));
+    lp.appendChild(el('div', 'ln dim', 'the mint is free, you only pay gas. never share your seed phrase: no real site or team member will ask for it.'));
 
     var chk = el('div', 'check');
     var crow = el('div', 'inrow');
@@ -1277,8 +1269,8 @@
       var r = DEMO ? { ok: true, status: 'PENDING' } : await apiGet('action=check&u=' + encodeURIComponent(u));
       if (!r || !r.ok) { cout.className = 'ln err'; cout.textContent = '✗ could not check right now'; return; }
       var s2 = r.status;
-      if (s2 === 'GTD') { cout.className = 'ln ok'; cout.textContent = '✓ @' + u + ' is selected for GTD. you can mint the testnet NFT.'; }
-      else if (s2 === 'FCFS') { cout.className = 'ln sky'; cout.textContent = '✓ @' + u + ' is selected for FCFS. you can claim testnet ' + TICKER + '.'; }
+      if (s2 === 'GTD') { cout.className = 'ln ok'; cout.textContent = '✓ @' + u + ' is selected for GTD. free mint guaranteed.'; }
+      else if (s2 === 'FCFS') { cout.className = 'ln sky'; cout.textContent = '✓ @' + u + ' is selected for FCFS. free mint, first come first served.'; }
       else if (s2 === 'PENDING') { cout.className = 'ln ok'; cout.textContent = '✓ @' + u + ' is whitelisted. selection is pending.'; }
       else if (s2 === 'IN_PROGRESS') { cout.className = 'ln err'; cout.textContent = '✗ @' + u + ' has not finished all tasks.'; }
       else { cout.className = 'ln err'; cout.textContent = '✗ @' + u + ' is not on the list.'; }
@@ -1583,13 +1575,13 @@
   /* ---------- treasure map roadmap ---------- */
   var CURRENT_PHASE = 0;
   function phases() {
-    var price = C.GTD_MINT_PRICE || '0.33 HYPE', R = C.RULES || {};
+    var R = C.RULES || {};
     return [
-      { n: 'I', name: 'Whitelist Isle', place: 'Phase 01 · you are here', text: 'The journey starts here. Join, fight in the arena and grow your crew.', items: ['Finish the X tasks and register your wallet', 'Play Fluff Arena and earn testnet ' + TICKER, 'Invite friends and earn ' + (R.REF_BONUS_PCT || 10) + '% of what they earn'] },
+      { n: 'I', name: 'Whitelist Isle', place: 'Phase 01 · you are here', text: 'The journey starts here. Join, fight in the arena and grow your crew.', items: ['Finish the X tasks and register your wallet', 'Play Fluff Arena and earn ' + TICKER, 'Invite friends and earn ' + (R.REF_BONUS_PCT || 10) + '% of what they earn'] },
       { n: 'II', name: 'Selection Reef', place: 'Phase 02', text: 'The crew is chosen by skill, by invites and by luck.', items: ['Game leaderboard: top ' + (R.GAME_GTD || 200) + ' GTD, next ' + (R.GAME_FCFS || 300) + ' FCFS', 'Invite leaderboard: top ' + (R.REF_GTD || 100) + ' GTD, next ' + (R.REF_FCFS || 200) + ' FCFS', 'Remaining spots: raffle among all whitelisted wallets'] },
-      { n: 'III', name: 'HyperEVM Bay', place: 'Phase 03 · testnet launch', text: 'The test launch on HyperEVM Testnet.', items: ['GTD mints the ElyFluff NFT for ' + price, 'FCFS and arena players claim testnet ' + TICKER, 'Every holder is recorded on-chain'] },
-      { n: 'IV', name: 'Qualification Pass', place: 'Phase 04', text: 'Only proven holders pass through to mainnet.', items: ['Testnet NFT and ' + TICKER + ' holders qualify', 'Game ' + TICKER + ' carries over 1:1, for NFT holders only', 'The mainnet list is locked'] },
-      { n: 'V', name: 'Elysium', place: 'The treasure · Nov 9', text: 'Elysium mainnet goes live. The treasure waits here.', items: ['ElyFluff NFT and ' + TICKER + ' launch on Elysium', 'NFT holders get their testnet game ' + TICKER + ' again on mainnet', '40% of ' + TICKER + ' to NFT holders'] }
+      { n: 'III', name: 'Elysium Gate', place: 'Phase 03 · date on X', text: 'ElyFluff goes live on Elysium mainnet. The launch date is announced on X.', items: ['Launch date announced on @' + handle(), 'GTD and FCFS wallets are loaded into OpenSea', 'Check your wallet with the wallet checker'] },
+      { n: 'IV', name: 'Free Mint Bay', place: 'Phase 04 · OpenSea', text: 'The ' + fmt(SUPPLY) + ' ElyFluffs are minted for free on OpenSea. Gas only.', items: ['GTD stage first: guaranteed, 1 per wallet', 'FCFS stage next: first come, while supply lasts', 'Mint only from the official OpenSea link'] },
+      { n: 'V', name: 'Fluff Treasury', place: 'The treasure', text: TICKER + ' goes live on Elysium. The treasure waits here.', items: ['Every arena ' + TICKER + ' and invite bonus is paid on Elysium mainnet', 'Claim with your registered wallet', '40% of ' + TICKER + ' to NFT holders'] }
     ];
   }
   var mapSt = { mode: '', sel: CURRENT_PHASE, raf: 0, trail: null };
@@ -1812,14 +1804,12 @@
 
   /* ---------- agent ---------- */
   function kb() {
-    var p = C.GTD_MINT_PRICE || '0.33 HYPE', hx = '@' + handle();
-    var t = timeLeft();
-    var cdTxt = !t ? 'on Nov 9' : (t.live ? 'now live' : 'in ' + t.d + ' days and ' + t.h + ' hours (Nov 9)');
+    var p = C.GTD_MINT_PRICE || 'FREE', hx = '@' + handle();
     return [
       { k: ['game', 'arena', 'play', 'fight', 'shooter', 'militia', 'battle'], a: 'Fluff Arena is our 2D jetpack battle game. It unlocks after you finish the whitelist tasks.\n\nPick a map (Elysium, HyperEVM City or Crimson Core). A round lasts ' + Math.round(((window.FluffArena && window.FluffArena.config.round) || 900) / 60) + ' minutes and you have one life, unless you grab a 1UP. Defeat enemies and they drop ' + TICKER + ', but bots collect it too, so be fast. Everything you earn is added to your claimable balance.' },
       { k: ['red', 'zone', 'redzone', 'danger'], a: 'In Fluff Arena, an air raid hits the red zone at the 10:00 mark. Dozens of missiles fall from the sky and nobody knows where they land, so get out fast when the warning appears.' },
       { k: ['blue', 'bluezone', 'drop', 'drops', 'rain'], a: 'In the last 5 minutes of a Fluff Arena round, a BLUE ZONE opens and ' + TICKER + ' rains down inside it. Expect a big fight there.' },
-      { k: ['claim', 'claimable', 'withdraw', 'earn', 'earned', 'balance', 'carry', 'mainnet'], a: 'Every ' + TICKER + ' you earn in Fluff Arena (plus your invite bonus) is added to your claimable balance. You claim it on HyperEVM Testnet in the launchpad.\n\nOn Elysium mainnet you receive the same amount again, but only if you hold an ElyFluff NFT.' },
+      { k: ['claim', 'claimable', 'withdraw', 'earn', 'earned', 'balance', 'carry'], a: 'Every ' + TICKER + ' you earn in Fluff Arena, plus your invite bonus, is added to your claimable balance. It is paid as real ' + TICKER + ' on Elysium mainnet: you claim it in the launchpad with your registered wallet.' },
       { k: ['key', 'access', 'login', 'password', 'device', 'lost'], a: 'When you join you get a private access key. You need it to log in on another phone or computer, and it protects your ' + TICKER + '. Find it under "my access key" after you log in. Never share it with anyone.' },
       { k: ['selection', 'selected', 'raffle', 'lottery', 'chosen', 'pick', 'picked', 'spots'], a: 'Selection:\n\nGame leaderboard: top ' + ((C.RULES || {}).GAME_GTD || 200) + ' get GTD, next ' + ((C.RULES || {}).GAME_FCFS || 300) + ' get FCFS.\nInvite leaderboard: top ' + ((C.RULES || {}).REF_GTD || 100) + ' get GTD, next ' + ((C.RULES || {}).REF_FCFS || 200) + ' get FCFS.\nAll remaining spots go to a raffle among everyone who joined the whitelist.' },
       { k: ['weapon', 'weapons', 'gun', 'guns', 'smg', 'shotgun', 'sniper', 'rocket', 'shield'], a: 'Weapon crates fall from the sky: Fluff SMG, Cloud Burst (shotgun), Halo Rail (sniper) and Crimson Rocket. Halo Shields absorb damage. You always keep your Blaster.' },
@@ -1827,27 +1817,27 @@
       { k: ['map', 'maps', 'heaven', 'elysium map', 'city', 'core'], a: 'There are 3 maps: Elysium (the heaven above the chain), HyperEVM City and Crimson Core. Choose one, or pick Random.' },
       { k: ['leaderboard', 'top', 'rank', 'ranking', 'record'], a: 'The game leaderboard ranks everyone by total ' + TICKER + ' earned in Fluff Arena. Top ' + ((C.RULES || {}).GAME_GTD || 200) + ' get GTD, the next ' + ((C.RULES || {}).GAME_FCFS || 300) + ' get FCFS. There is also an invite leaderboard and a best single round board.' },
       { k: ['controls', 'jetpack', 'shoot', 'aim', 'move'], a: 'Touch: left stick moves, push it up to use the jetpack. Right stick aims, push it far to shoot.\nKeyboard: A/D move, W or space jetpack, mouse to aim, click to shoot, R to reload.' },
-      { k: ['hi', 'hello', 'hey', 'gm', 'yo', 'sup'], a: 'Hey! I am the ElyFluff assistant. Ask me about the whitelist, GTD and FCFS, the testnet mint, tokenomics or the roadmap.' },
-      { k: ['what', 'about', 'elyfluff', 'project', 'explain', 'is'], a: 'ElyFluff is a ' + fmt(SUPPLY) + '-piece NFT collection paired with the ' + TICKER + ' token, built for the Elysium mainnet.\n\nIt launches first on HyperEVM Testnet. Wallets that hold the testnet NFT or testnet ' + TICKER + ' qualify for Elysium mainnet.' },
+      { k: ['hi', 'hello', 'hey', 'gm', 'yo', 'sup'], a: 'Hey! I am the ElyFluff assistant. Ask me about the whitelist, the free mint, GTD and FCFS, the game, tokenomics or the roadmap.' },
+      { k: ['what', 'about', 'elyfluff', 'project', 'explain', 'is'], a: 'ElyFluff is a ' + fmt(SUPPLY) + '-piece NFT collection paired with the ' + TICKER + ' token, launching on Elysium mainnet.\n\nThe NFT mint is free on OpenSea for selected wallets, and the ' + TICKER + ' you earn in Fluff Arena is paid on Elysium.' },
       { k: ['whitelist', 'wl', 'join', 'apply', 'how', 'task', 'tasks', 'qualify', 'eligible'], a: 'To join the whitelist:\n\n1. Enter your X username\n2. Follow ' + hx + ' on X\n3. Like and repost our post\n4. Write your comment here, it is posted as a reply on X\n5. Register your EVM wallet\n\nThen you get your access key, your ElyFluff card and an invite link.' },
-      { k: ['gtd', 'guaranteed', 'guarantee'], a: 'GTD means guaranteed. GTD wallets can mint the ElyFluff testnet NFT on HyperEVM Testnet for ' + p + '. GTD goes to the top ' + ((C.RULES || {}).GAME_GTD || 200) + ' of the game leaderboard, the top ' + ((C.RULES || {}).REF_GTD || 100) + ' inviters and raffle winners.' },
-      { k: ['fcfs', 'first', 'come', 'served'], a: 'FCFS wallets receive testnet ' + TICKER + ' by claim. FCFS goes to game ranks ' + (((C.RULES || {}).GAME_GTD || 200) + 1) + ' to ' + (((C.RULES || {}).GAME_GTD || 200) + ((C.RULES || {}).GAME_FCFS || 300)) + ', the next ' + ((C.RULES || {}).REF_FCFS || 200) + ' inviters after the top ' + ((C.RULES || {}).REF_GTD || 100) + ', and raffle winners.' },
-      { k: ['difference', 'vs', 'versus', 'compare', 'gtd', 'fcfs'], a: 'GTD: guaranteed testnet NFT mint for ' + p + '.\nFCFS: testnet ' + TICKER + ' by claim.\n\nBoth come from the game leaderboard, the invite leaderboard or the raffle, and both lead to Elysium mainnet.' },
-      { k: ['mint', 'price', 'cost', 'hype', 'pay', 'minting'], a: 'The GTD testnet mint costs ' + p + ' on HyperEVM Testnet. ' + (C.MINT_LIVE ? 'The mint is live now in the Testnet launchpad section.' : 'Minting opens after the selection is announced on X.') },
+      { k: ['gtd', 'guaranteed', 'guarantee'], a: 'GTD means guaranteed. GTD wallets get a FREE ElyFluff mint in the first OpenSea stage. GTD goes to the top ' + ((C.RULES || {}).GAME_GTD || 200) + ' of the game leaderboard, the top ' + ((C.RULES || {}).REF_GTD || 100) + ' inviters and raffle winners. Use the wallet checker to see if you are in.' },
+      { k: ['fcfs', 'first', 'come', 'served'], a: 'FCFS means first come, first served. FCFS wallets also mint for FREE on OpenSea, in the stage right after GTD, while supply lasts.' },
+      { k: ['difference', 'vs', 'versus', 'compare', 'gtd', 'fcfs'], a: 'Both are FREE mints on OpenSea.\n\nGTD: guaranteed, first stage.\nFCFS: second stage, first come first served, until the ' + fmt(SUPPLY) + ' supply is gone.' },
+      { k: ['mint', 'price', 'cost', 'hype', 'pay', 'minting', 'free', 'opensea'], a: 'The ElyFluff mint is FREE and happens on OpenSea, not on this website. You only pay the network gas fee. One free mint per selected wallet. ' + (C.OPENSEA_URL ? 'Always use the OpenSea link in the launchpad section.' : 'The official OpenSea link will be shared on this site and on ' + hx + '.') },
       { k: ['token', 'fluff', 'ticker', 'supply', 'coin'], a: 'The token is ' + TICKER + '. The total supply is ' + (C.TOKEN_SUPPLY || 'TBA') + ' and will be announced later.' },
       { k: ['tokenomics', 'allocation', 'distribution', 'split', 'percent', 'share'], a: TICKER + ' allocation:\n\n40% NFT holders\n20% token holders\n15% Elysium active users\n15% liquidity\n5% team\n5% vault (marketing)' },
-      { k: ['mainnet', 'elysium', 'launch', 'date', 'when', 'live', 'time'], a: 'Elysium mainnet goes live ' + cdTxt + '. ElyFluff NFT and ' + TICKER + ' launch there after the HyperEVM Testnet phase.' },
-      { k: ['testnet', 'hyperevm', 'hyperliquid', 'network', 'chain', 'faucet'], a: 'The test launch runs on HyperEVM Testnet. GTD mints the NFT there for ' + p + ' (test HYPE). You can get test HYPE from the official Hyperliquid testnet faucet.' },
-      { k: ['selection', 'selected', 'announce', 'result', 'winner', 'status', 'check'], a: 'Selections for GTD and FCFS are announced on X (' + hx + '). You can also check your status in the Testnet launchpad section with your X username.' },
+      { k: ['mainnet', 'elysium', 'launch', 'date', 'when', 'live', 'time'], a: 'ElyFluff launches on Elysium mainnet. The launch date is not set yet: it will be announced on ' + hx + ' and on this site.' },
+      { k: ['testnet', 'hyperevm', 'hyperliquid', 'network', 'chain', 'faucet', 'gas'], a: 'There is no testnet phase. Everything happens on Elysium mainnet, Kinetiq\'s Layer 2 for Hyperliquid. Gas is paid in HYPE, so keep a little HYPE on Elysium.' },
+      { k: ['selection', 'selected', 'announce', 'result', 'winner', 'status', 'check', 'checker', 'eligible'], a: 'Use the wallet checker on this site: paste your wallet address and it shows if you are GTD, FCFS or not selected yet. Selections are also announced on ' + hx + '.' },
       { k: ['referral', 'invite', 'ref', 'friends', 'code', 'bonus'], a: 'After you join you get an invite link. You earn ' + ((C.RULES || {}).REF_BONUS_PCT || 10) + '% of everything your friends earn in Fluff Arena. Friends count once they finish all tasks.\n\nTop ' + ((C.RULES || {}).REF_GTD || 100) + ' inviters get GTD, the next ' + ((C.RULES || {}).REF_FCFS || 200) + ' get FCFS.' },
       { k: ['card', 'social', 'image', 'download'], a: 'When you finish all 4 tasks, the site creates your ElyFluff card. You can download it and share it on X.' },
       { k: ['wallet', 'seed', 'phrase', 'private', 'safe', 'scam', 'dm', 'security'], a: 'Stay safe: we never ask for your seed phrase or private key, and we never DM you first. Only trust ' + hx + ' and this website. You only need to enter your public wallet address.' },
-      { k: ['roadmap', 'phase', 'plan', 'next', 'steps'], a: 'Roadmap:\n\n1. Whitelist, Fluff Arena and invites (live now)\n2. Selection: game board, invite board, raffle\n3. HyperEVM Testnet launch: GTD mint and ' + TICKER + ' claim\n4. Mainnet qualification\n5. Elysium mainnet: game ' + TICKER + ' paid again to NFT holders' },
+      { k: ['roadmap', 'phase', 'plan', 'next', 'steps'], a: 'Roadmap:\n\n1. Whitelist, Fluff Arena and invites (live now)\n2. Selection: game board, invite board, raffle\n3. Launch on Elysium mainnet (date announced on X)\n4. Free mint on OpenSea: GTD first, then FCFS\n5. ' + TICKER + ' claim on Elysium' },
       { k: ['team', 'founder', 'dev'], a: 'The team allocation is 5% of ' + TICKER + '. Follow ' + hx + ' on X for team updates.' },
       { k: ['vault', 'marketing'], a: 'The vault holds 5% of ' + TICKER + ' and is used for marketing.' },
       { k: ['liquidity', 'lp', 'pool'], a: '15% of ' + TICKER + ' is set aside for liquidity.' },
       { k: ['nft', 'collection', 'art', 'fluffs', 'traits'], a: 'The ElyFluff collection has ' + fmt(SUPPLY) + ' NFTs. NFT holders receive 40% of the ' + TICKER + ' supply, the largest share.' },
-      { k: ['value', 'worth', 'profit', 'pump', 'moon', 'investment'], a: 'Testnet assets have no monetary value, and I cannot give price predictions. The testnet phase decides who qualifies for Elysium mainnet.' },
+      { k: ['value', 'worth', 'profit', 'pump', 'moon', 'investment'], a: 'I cannot give price predictions or financial advice. Follow ' + hx + ' for official updates.' },
       { k: ['x', 'twitter', 'contact', 'social', 'follow', 'support'], a: 'Our official X account is ' + hx + '. Follow it for every update and announcement.' }
     ];
   }
@@ -1863,11 +1853,11 @@
     });
     if (best && score > 0) {
       if (!isUnlocked() && best.k.some(function (k) { return SECRET.indexOf(k) !== -1; })) {
-        return 'That is inside the ElyFluff vault. Complete the 4 whitelist tasks to unlock the tokenomics, the treasure map roadmap and the testnet launchpad.';
+        return 'That is inside the ElyFluff vault. Complete the 4 whitelist tasks to unlock the tokenomics, the treasure map roadmap and the free mint launchpad.';
       }
       return best.a;
     }
-    return 'I can help with ElyFluff details: the whitelist, GTD and FCFS, the testnet mint, tokenomics and the roadmap. For anything else, follow @' + handle() + ' on X.';
+    return 'I can help with ElyFluff details: the whitelist, the free mint, GTD and FCFS, tokenomics and the roadmap. For anything else, follow @' + handle() + ' on X.';
   }
   function agent() {
     var box = $('#agent'), msgs = $('#agentMsgs'), form = $('#agentForm'), inp = $('#agentIn'), chips = $('#agentChips');
@@ -1901,7 +1891,7 @@
       await typeOut(answer);
       busyAg = false;
     }
-    var CH = ['What is ElyFluff?', 'How do I join?', 'How does the game work?', 'How is selection done?', 'Invite bonus', 'GTD vs FCFS', 'Mint price', 'Tokenomics', 'When is mainnet?', 'Is it safe?'];
+    var CH = ['What is ElyFluff?', 'How do I join?', 'Is the mint free?', 'How does the game work?', 'How is selection done?', 'Invite bonus', 'GTD vs FCFS', 'Tokenomics', 'When is mainnet?', 'Is it safe?'];
     CH.forEach(function (c) {
       var b = el('button', 'chip', c); b.type = 'button';
       b.addEventListener('click', function () { ask(c); });
@@ -1909,7 +1899,7 @@
     });
     function open() {
       box.hidden = false; document.body.classList.add('agent-open');
-      if (!started) { started = true; typeOut('Hi, I am ElyFluff AI. Ask me anything about the project: whitelist, GTD and FCFS, the testnet mint, tokenomics or the roadmap.'); }
+      if (!started) { started = true; typeOut('Hi, I am ElyFluff AI. Ask me anything about the project: whitelist, the free mint, GTD and FCFS, tokenomics or the roadmap.'); }
       setTimeout(function () { if (window.innerWidth > 600) inp.focus(); }, 200);
     }
     function close() { box.hidden = true; document.body.classList.remove('agent-open'); }

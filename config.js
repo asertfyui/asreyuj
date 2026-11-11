@@ -12,7 +12,7 @@ window.ELYFLUFF_CONFIG = {
   X_HANDLE: "ElyFluff",
 
   /* The X post people must like, repost and comment on */
-  TASK_POST_URL: "https://x.com/ElyFluff/status/2118489278061699218",
+  TASK_POST_URL: "https://x.com/ElyFluff/status/1000000000000000000",
 
   /* Your website address (used for share posts and referral links) */
   SITE_URL: "https://elyfluff.xyz",
@@ -21,30 +21,34 @@ window.ELYFLUFF_CONFIG = {
      Leave empty ("") to run the site in demo mode (nothing is saved). */
   SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwG-DepWcQkAhg2szuiKkqzTpSY5XjjPAtFm8_SyrQ_6eMhtDPeJymsh2mvKkNbaeM0KQ/exec",
 
+  /* Winner checker (checker.html): Web app URL of the Winners sheet script. */
+  WINNERS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyNWek5gSNjZgbpGpOfr85Ou0jLxsOYMUq-HZKibiw3-W0zJgTEJvLK6zNo5UmshWoI/exec",
+
   /* AI agent: true = use Gemini through your Apps Script (needs SCRIPT_URL
      and a GEMINI_API_KEY in Script Properties). false = built-in answers only. */
   AGENT_AI: false,
 
-  /* Elysium mainnet launch time (UTC) */
-  ELYSIUM_LAUNCH_UTC: "2026-11-09T00:00:00Z",
+  /* Launch date text shown on the site. Change it when the date is announced.
+     Example: "Dec 1, 2026" */
+  LAUNCH_TEXT: "announced on X",
 
-  /* ---------- HyperEVM testnet contracts ----------
-     Paste the addresses after you deploy (see LAUNCH-GUIDE.md).
-     Leave empty ("") until they are deployed. */
-  CHAIN_ID: 998,
-  CHAIN_NAME: "HyperEVM Testnet",
-  EXPLORER_URL: "https://testnet.purrsec.com",
-  NFT_CONTRACT: "",          /* ElyFluffNFT address */
-  TOKEN_CONTRACT: "",        /* FluffToken address */
-  CLAIM_CONTRACT: "",        /* FluffClaim address */
+  /* ---------- OpenSea mint ----------
+     The NFT mint happens on OpenSea (not on this website).
+     Paste the OpenSea drop link, then set MINT_LIVE to true. */
+  OPENSEA_URL: "",
+  MINT_LIVE: false,
+  GTD_MINT_PRICE: "FREE",
 
-  /* Testnet mint settings */
-  GTD_MINT_PRICE: "0.33 HYPE",
-  MINT_LIVE: false,          /* true = GTD mint button becomes active */
+  /* ---------- $FLUFF claim on Elysium mainnet ----------
+     Fill these when Elysium details are public and the contracts are deployed. */
+  CHAIN_ID: 0,               /* Elysium mainnet chain ID (number, no quotes) */
+  RPC_URL: "",               /* Elysium mainnet RPC link */
+  EXPLORER_URL: "",          /* Elysium mainnet explorer link */
+  CHAIN_NAME: "Elysium",
+  NATIVE_SYMBOL: "HYPE",     /* gas token on Elysium */
+  TOKEN_CONTRACT: "",        /* FluffToken address (from admin.html) */
+  CLAIM_CONTRACT: "",        /* FluffClaim address (from admin.html) */
   CLAIM_LIVE: false,         /* true = $FLUFF claim button becomes active */
-
-  /* Live HyperEVM Testnet block number (public RPC) */
-  HYPEREVM_TESTNET_RPC: "https://rpc.hyperliquid-testnet.xyz/evm",
 
   /* Character art (upload this image next to index.html) */
   ART_IMAGE: "nft-11.jpg",
